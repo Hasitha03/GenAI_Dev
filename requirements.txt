@@ -1,0 +1,17 @@
+streamlit
+scipy
+pandas
+matplotlib
+seaborn
+requests
+Pillow
+python-docx
+scikit-learn
+numpy
+openai
+sounddevice
+soundfile
+bokeh
+plotly
+pyecharts
+openpyxl
