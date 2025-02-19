@@ -1,3 +1,5 @@
+from operator import index
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -493,7 +495,7 @@ include any key variables that you calculated in the code inside {{}}.
         response_json = response.json()
         response_content = response_json['choices'][0]['message']['content']
 
-        # Save the assistant's response to the session state
+            # Save the assistant's response to the session state
         st.session_state.messages.append({"role": "assistant", "content": response_content})
         # Execute the code segments and get results
         results = execute_analysis(df, response_content)
@@ -608,11 +610,25 @@ def get_sample_queries(data_source):
     }
     return queries.get(data_source, [])
 
-def format_list(items):
+# Initialize session state
+if "show_cost_options" not in st.session_state:
+    st.session_state.show_cost_options = False
+if "cost_consolidation_type" not in st.session_state:
+    st.session_state.cost_consolidation_type = None
+if "results" not in st.session_state:
+    st.session_state.results = None
+if "dynamic_clicked" not in st.session_state:
+    st.session_state.dynamic_clicked = False
+if "total_shipment_capacity" not in st.session_state:
+    st.session_state.total_shipment_capacity = 46
+if "shipment_window_range" not in st.session_state:
+    st.session_state.shipment_window_range = (2, 7)
 
-    if not items:
-        return "<span style='color: black; font-style: italic;'> All.</span>"
-    return ", ".join(f"<span style='font-size: 18px; color: #333;'>{item}</span>" for item in items)
+def reset_session_states():
+    st.session_state.show_cost_options = False
+    st.session_state.cost_consolidation_type = None
+    st.session_state.dynamic_clicked = False
+    st.session_state.results = None
 
 
 def main():
@@ -776,6 +792,7 @@ def main():
                 # Use the placeholder to display the error
                 error_placeholder.error(f"Error recording audio: {str(e)}")
 
+
     col1, col2 = st.columns([1, 5])
     with col1:
         submit_button = st.button("🔍 Analyze")
@@ -783,10 +800,17 @@ def main():
     if submit_button and query:
 
         # Move time tracking and spinner to encompass both analysis and display
-        with st.spinner("Analyzing data and generating visualizations..."):
-            start_time = time.time()
-            # hit intent analysis function and generate response
+        with st.spinner("Analyzing data "):
+
             intent = finding_intent(query=query, api_key=api_key)
+            if "last_intent" not in st.session_state:
+                st.session_state.last_intent = intent
+
+            # If the intent has changed, reset the session states
+            if intent != st.session_state.last_intent:
+                reset_session_states()
+                st.session_state.last_intent = intent
+
             if intent == 'Data Analysis':
                 # Perform analysis
                 #st.write("It is Data Analysis prompt\n")
@@ -797,14 +821,8 @@ def main():
                     st.session_state.current_data_source
                 )
             elif intent == 'Cost Optimization':
-                #st.write("It is cost optimization prompt\n")
-
-                parameters = parameter_values.get_parameters_values(api_key, query)
-                #st.write(parameters)  ## checkkk
-
-                results = cost_cosnsolidation.run_cost_optimization_simulation(parameters , api_key)
-                if results is not None:
-                    cost_cosnsolidation.cost_calculation(parameters, results['params'] )
+                results = None
+                st.session_state.show_cost_options = True
 
             if results and intent != 'Cost Optimization':
                 # Display results inside the spinner context
@@ -821,15 +839,137 @@ def main():
                     "chart_code": results['chart_code'],
                 }
 
-                # Check if this exact query isn't already the last entry
                 if not st.session_state.chat_history or st.session_state.chat_history[-1]["query"] != query:
                     st.session_state.chat_history.append(chat_entry)
 
-        end_time = time.time()
-        time_taken = end_time - start_time
 
-        # Show completion message after spinner
-        st.info(f"Analysis completed in {time_taken:.1f} seconds")
+    if st.session_state.show_cost_options:
+
+        st.write("You have selected a cost-saving strategy. Please choose a specific approach to proceed further.")
+
+        # Main cost-saving strategy selection using radio buttons
+        cost_strategy = st.radio(
+            "Select a cost-saving strategy:",
+            options=["Cost Consolidation", "Network Optimization", "Min Order Rule"],
+            key="cost_strategy",
+            index = None
+        )
+
+        # Handle cost consolidation selection
+        if cost_strategy == "Cost Consolidation":
+            st.session_state.cost_consolidation_type = "Cost Consolidation"
+
+            st.write("You have selected 'Cost Consolidation.' Please choose a specific approach to continue.")
+
+            # Sub-options for Cost Consolidation using radio buttons
+            consolidation_approach = st.radio(
+                "Select an approach:",
+                options=["Static", "Dynamic"],
+                key="consolidation_approach",
+                index = None
+            )
+
+            if consolidation_approach == "Static":
+                st.session_state.dynamic_clicked = False
+                st.write("You have selected the **Static** way of approaching the query. Here's the suitable result.")
+
+            elif consolidation_approach == "Dynamic":
+                st.session_state.dynamic_clicked = True
+                st.write("You have selected the **Dynamic** way of approaching the query.")
+                col1, col2, col3 = st.columns(3)
+
+                with col1:
+                    st.session_state.total_shipment_capacity = st.slider("TOTAL SHIPMENT CAPACITY", 26, 52, 46)
+
+                with col3:
+                    st.session_state.shipment_window_range = st.slider("SHIPMENT WINDOW", 0, 30, (2, 7))
+
+                @st.cache_data
+                def load_data():
+                    df = pd.read_excel('Complete Input.xlsx', sheet_name='Sheet1')
+                    df['SHIPPED_DATE'] = pd.to_datetime(df['SHIPPED_DATE'], dayfirst=True)
+                    rate_card_ambient = pd.read_excel('Complete Input.xlsx', sheet_name='AMBIENT')
+                    rate_card_ambcontrol = pd.read_excel('Complete Input.xlsx', sheet_name='AMBCONTROL')
+                    return df, rate_card_ambient, rate_card_ambcontrol
+
+                # Rename df to avoid conflicts
+                data_df, rate_card_ambient, rate_card_ambcontrol = load_data()
+
+                if 'parameters' not in st.session_state:
+                    st.session_state.parameters = parameter_values.get_parameters_values(api_key,query)
+
+                # Initialize session state for selected postcodes and customers if they don't exist
+                if 'selected_postcodes' not in st.session_state:
+                    st.session_state.selected_postcodes = st.session_state.parameters.get('selected_postcodes', [])
+                if 'selected_customers' not in st.session_state:
+                    st.session_state.selected_customers = st.session_state.parameters.get('selected_customers', [])
+
+                if not st.session_state.selected_postcodes and st.session_state.selected_customers:
+                    group_method = 'Customer Level'
+                else:
+                    group_method = st.radio("Consolidation Level", ('Post Code Level', 'Customer Level'))
+
+                group_field = 'SHORT_POSTCODE' if group_method == 'Post Code Level' else 'NAME'
+
+                if group_method == 'Post Code Level':
+                    all_postcodes = st.checkbox("All Post Codes", value=False)
+
+                    if not all_postcodes:
+                        postcode_counts = data_df['SHORT_POSTCODE'].value_counts()
+                        postcode_options = postcode_counts.index.tolist()
+                        #default_postcodes = [postcode for postcode in postcodes if postcode in postcode_options]
+                        selected_postcodes = st.multiselect(
+                            "Select Post Codes",
+                            options=postcode_options,
+                            default=st.session_state.selected_postcodes,
+                            format_func=lambda x: f"{x} ({postcode_counts[x]})")
+
+                        st.session_state.selected_postcodes=selected_postcodes
+
+                else:  # Customer Level
+                    all_customers = st.checkbox("All Customers", value=False)
+
+                    if not all_customers:
+                        customer_counts = data_df['NAME'].value_counts()
+                        customer_options = customer_counts.index.tolist()
+                        #default_customers = [customer for customer in customers if customer in customer_options]
+                        selected_customers = st.multiselect(
+                            "Select Customers",
+                            options=customer_options,
+                            default=st.session_state.selected_customers,  # Select all customers by default
+                            format_func=lambda x: f"{x} ({customer_counts[x]})"
+                        )
+                        st.session_state.selected_customers = selected_customers
+
+                # Filter the dataframe based on the selection
+                if group_method == 'Post Code Level' and not all_postcodes:
+                    if st.session_state.selected_postcodes:  # Only filter if some postcodes are selected
+                        data_df = data_df[data_df['SHORT_POSTCODE'].isin(st.session_state.selected_postcodes)]
+
+                elif group_method == 'Customer Level' and not all_customers:
+                    if st.session_state.selected_customers:  # Only filter if some customers are selected
+                        data_df = data_df[data_df['NAME'].isin(st.session_state.selected_customers)]
+
+                # Handle dynamic execution
+                if st.button("Run Simulation"):
+                    if st.session_state.dynamic_clicked:
+                        with st.spinner("Running cost optimization simulation. Please wait..."):
+                            #parameters = parameter_values.get_parameters_values(api_key, query)
+
+                            st.session_state.results = cost_cosnsolidation.run_cost_optimization_simulation(st.session_state.parameters,
+                                                                                                            api_key , total_capacity =st.session_state.total_shipment_capacity,
+                    shipment_window = st.session_state.shipment_window_range)
+                            cost_cosnsolidation.cost_calculation(st.session_state.parameters, st.session_state.results['params'] ,total_capacity =st.session_state.total_shipment_capacity)
+
+
+
+        elif cost_strategy == "Network Optimization":
+            st.session_state.cost_consolidation_type = "Network Optimization"
+            st.write("You have selected 'Network Optimization.' Here's the approach:")
+
+        elif cost_strategy == "Min Order Rule":
+            st.session_state.cost_consolidation_type = "Min Order Rule"
+            st.write("You have selected 'Min Order Rule.' Here's the approach:")
 
     # Display analysis history with download and delete options
     if st.session_state.chat_history:

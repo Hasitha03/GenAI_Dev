@@ -23,8 +23,8 @@ global group_field
 global group_method
 import openai
 
-shipment_window_range=(1, 10)
-total_shipment_capacity= 36
+#shipment_window_range=(1, 10)
+#total_shipment_capacity= 36
 
 import openai
 
@@ -46,6 +46,7 @@ def rephrase_text(api_key, text):
 
     try:
         # Call OpenAI's API for rephrasing
+
         response = openai.chat.completions.create(
             model="gpt-4o",  # Using GPT-4o for optimal performance
             messages=[
@@ -57,7 +58,8 @@ def rephrase_text(api_key, text):
         )
 
         # Extract and return the rephrased text
-        return response.choices[0].message.content
+        result = response.choices[0].message.content
+        return result
 
     except openai.OpenAIError as e:
         return f"An error occurred with the OpenAI API: {str(e)}"
@@ -120,11 +122,6 @@ def get_filtered_data(parameters, df):
     #     st.write("minimum date: ", df['SHIPPED_DATE'].min(), "maximum date: ", df['SHIPPED_DATE'].max())
 
     return df
-        
-
-# Create tabs
-# tab1, tab2 = st.tabs(["Simulation", "Calculation"])
-
 
 # Helper functions
 def calculate_priority(shipped_date, current_date, shipment_window):
@@ -337,38 +334,38 @@ def create_utilization_chart(all_consolidated_shipments):
 
     return fig
 
-def create_pallet_distribution_chart(all_consolidated_shipments, total_shipment_capacity):
-    # Create bins with 5-pallet intervals
-    bin_size = 5
-    num_bins = (total_shipment_capacity + bin_size - 1) // bin_size  # Round up to nearest bin
-    pallet_bins = {f"{i*bin_size+1}-{min((i+1)*bin_size, total_shipment_capacity)}": 0 for i in range(num_bins)}
-
-    for shipment in all_consolidated_shipments:
-        total_pallets = shipment['Total Pallets']
-        for bin_range, count in pallet_bins.items():
-            low, high = map(int, bin_range.split('-'))
-            if low <= total_pallets <= high:
-                pallet_bins[bin_range] += 1
-                break
-
-    total_shipments = len(all_consolidated_shipments)
-    pallet_distribution = {bin: (count / total_shipments) * 100 for bin, count in pallet_bins.items()}
-
-    # Sort the bins to ensure they're in the correct order
-    sorted_bins = sorted(pallet_distribution.items(), key=lambda x: int(x[0].split('-')[0]))
-
-    fig = go.Figure(data=[go.Bar(x=[bin for bin, _ in sorted_bins], 
-                                 y=[value for _, value in sorted_bins],
-                                 marker_color='#1f77b4')])
-    fig.update_layout(
-        title={'text': 'Pallet Distribution', 'font': {'size': 22, 'weight': 'normal'}},
-        xaxis_title='Pallet Range',
-        yaxis_title='Percentage of Shipments',
-        xaxis=dict(tickangle=0),
-        width=600,
-        height=500
-    )
-    return fig
+# def create_pallet_distribution_chart(all_consolidated_shipments, total_shipment_capacity):
+#     # Create bins with 5-pallet intervals
+#     bin_size = 5
+#     num_bins = (total_shipment_capacity + bin_size - 1) // bin_size  # Round up to nearest bin
+#     pallet_bins = {f"{i*bin_size+1}-{min((i+1)*bin_size, total_shipment_capacity)}": 0 for i in range(num_bins)}
+#
+#     for shipment in all_consolidated_shipments:
+#         total_pallets = shipment['Total Pallets']
+#         for bin_range, count in pallet_bins.items():
+#             low, high = map(int, bin_range.split('-'))
+#             if low <= total_pallets <= high:
+#                 pallet_bins[bin_range] += 1
+#                 break
+#
+#     total_shipments = len(all_consolidated_shipments)
+#     pallet_distribution = {bin: (count / total_shipments) * 100 for bin, count in pallet_bins.items()}
+#
+#     # Sort the bins to ensure they're in the correct order
+#     sorted_bins = sorted(pallet_distribution.items(), key=lambda x: int(x[0].split('-')[0]))
+#
+#     fig = go.Figure(data=[go.Bar(x=[bin for bin, _ in sorted_bins],
+#                                  y=[value for _, value in sorted_bins],
+#                                  marker_color='#1f77b4')])
+#     fig.update_layout(
+#         title={'text': 'Pallet Distribution', 'font': {'size': 22, 'weight': 'normal'}},
+#         xaxis_title='Pallet Range',
+#         yaxis_title='Percentage of Shipments',
+#         xaxis=dict(tickangle=0),
+#         width=600,
+#         height=500
+#     )
+#     return fig
 
 
 def create_consolidated_shipments_calendar(consolidated_df):
@@ -727,7 +724,7 @@ div.stDownloadButton > button:hover {
 
     
 # Simulation tab
-def run_cost_optimization_simulation(parameters , api_key):
+def run_cost_optimization_simulation(parameters , api_key , total_capacity,shipment_window):
 
     start_date= parameters['start_date']
     end_date= parameters['end_date']
@@ -746,7 +743,7 @@ def run_cost_optimization_simulation(parameters , api_key):
     date_range = pd.date_range(start=start_date, end=end_date)
     
     # Generate all combinations of parameters
-    shipment_windows = range(shipment_window_range[0], shipment_window_range[1] + 1)
+    shipment_windows = range(shipment_window[0], shipment_window[1] + 1)
     utilization_threshold = 95
     
     total_groups = len(grouped)
@@ -769,7 +766,7 @@ def run_cost_optimization_simulation(parameters , api_key):
         for (prod_type, group), group_df in grouped:
             consolidated_shipments, _ = consolidate_shipments(
                 group_df, high_priority_limit, utilization_threshold, 
-                shipment_window, date_range, lambda: None, total_shipment_capacity
+                shipment_window, date_range, lambda: None, total_capacity
             )
             all_consolidated_shipments.extend(consolidated_shipments)
             
@@ -818,37 +815,40 @@ def run_cost_optimization_simulation(parameters , api_key):
     #st.markdown("<h2 style='font-size:26px;'>Best Simulation Results</h2>", unsafe_allow_html=True)
     #st.write(f"The optimal Shipment Window for the selected data is: {best_params[0]}")
 
+
+    with st.expander("VIEW APPROACH OF COST CONSOLIDATION", expanded=False):
         summary_text = (
-    f"Optimizing outbound deliveries and identifying cost-saving opportunities involve analyzing various factors "
-    f"such as order patterns, delivery routes, shipping costs, and consolidation opportunities.\n\n"
+            f"Optimizing outbound deliveries and identifying cost-saving opportunities involve analyzing various factors "
+            f"such as order patterns, delivery routes, shipping costs, and consolidation opportunities.\n\n"
 
-    f"On analyzing the data, I can provide some estimates of cost savings on the historical data if we were to "
-    f"group orders to consolidate deliveries.\n\n"
+            f"On analyzing the data, I can provide some estimates of cost savings on the historical data if we were to "
+            f"group orders to consolidate deliveries.\n\n"
 
-    "**APPROACH TAKEN**\n\n"  # Ensure it's already in uppercase and same.
-    f"To consolidate the deliveries, A heuristic approach was used, and the methodology is as follows:\n\n"
+            "**APPROACH TAKEN**\n\n"
+            f"To consolidate the deliveries, A heuristic approach was used, and the methodology is as follows:\n\n"
 
-    f"**Group Shipments**: Orders are consolidated within a shipment window to reduce transportation costs while "
-    f"maintaining timely deliveries. A shipment window represents the number of days prior to the current delivery "
-    f"that the order could be potentially shipped, thus representing an opportunity to group it with earlier deliveries.\n\n"
+            f"**Group Shipments**: Orders are consolidated within a shipment window to reduce transportation costs while "
+            f"maintaining timely deliveries. A shipment window represents the number of days prior to the current delivery "
+            f"that the order could be potentially shipped, thus representing an opportunity to group it with earlier deliveries.\n\n"
 
-    f"**Iterate Over Shipment Windows**: The model systematically evaluates all possible shipment windows, testing "
-    f"different configurations to identify the most effective scheduling approach.\n\n"
+            f"**Iterate Over Shipment Windows**: The model systematically evaluates all possible shipment windows, testing "
+            f"different configurations to identify the most effective scheduling approach.\n\n"
 
-    f"**Performance Metric Calculation**: Key performance metrics are assessed for each shipment window, including:\n"
-    f"- **Cost savings**\n"
-    f"- **Utilization rate**\n"
-    f"- **CO2 emission reduction**\n\n"
+            f"**Performance Metric Calculation**: Key performance metrics are assessed for each shipment window, including:\n"
+            f"- **Cost savings**\n"
+            f"- **Utilization rate**\n"
+            f"- **CO2 emission reduction**\n\n"
 
-    f"**Comparison and Selection**: After evaluating all configurations, the shipment window that maximizes cost savings "
-    f"while maintaining operational efficiency is identified, and results are displayed as per the best parameter.\n\n"
+            f"**Comparison and Selection**: After evaluating all configurations, the shipment window that maximizes cost savings "
+            f"while maintaining operational efficiency is identified, and results are displayed as per the best parameter.\n\n"
 
-    f"This method allows us to optimize logistics operations dynamically, ensuring that both financial and environmental "
-    f"factors are balanced effectively."
-    )
+            f"This method allows us to optimize logistics operations dynamically, ensuring that both financial and environmental "
+            f"factors are balanced effectively."
+        )
+        rephrased_text = rephrase_text(api_key, summary_text)
+        st.write(rephrased_text)
 
-    rephrased_text = rephrase_text(api_key, summary_text)
-    st.write(rephrased_text)
+
 
     # Display the summary sentence before calculations start
     #col1, col2, col3 = st.columns(3)
@@ -876,7 +876,7 @@ def run_cost_optimization_simulation(parameters , api_key):
             for i, ((prod_type, group), group_df) in enumerate(grouped):
                 consolidated_shipments, allocation_matrix = consolidate_shipments(
                     group_df, calc_high_priority_limit, calc_utilization_threshold,
-                    calc_shipment_window, date_range, lambda: None, total_shipment_capacity
+                    calc_shipment_window, date_range, lambda: None, total_capacity
                 )
                 all_consolidated_shipments.extend(consolidated_shipments)
                 all_allocation_matrices.append(allocation_matrix)
@@ -887,32 +887,34 @@ def run_cost_optimization_simulation(parameters , api_key):
             selected_customers = ", ".join(parameters["selected_customers"]) if parameters["selected_customers"] else "All Customers"
 
             metrics = calculate_metrics(all_consolidated_shipments, df)
-            st.markdown("<h2 style='font-size:24px;'>Identified cost savings and Key Performance Indicators (KPIs)</h2>", unsafe_allow_html=True)
+
+
+        with st.expander("IDENTIFIED COST SAVINGS AND KEY PERFORMANCE INDICATORS(KPIs)", expanded=False):
             main_text = (
-                f"Through extensive analysis, the OPTIMAL SHIPMENT WINDOW was determined to be **{best_params[0]}**, "
-                f"with a PALLET SIZE of **46** for **parameters[postcodes]**: {selected_postcodes} and **parameters[customers]**: {selected_customers}."
-                f"These optimizations resulted in SIGNIFICANT EFFICIENCY IMPROVEMENTS:\n\n"
+                    f"Through extensive analysis, the **OPTIMAL SHIPMENT WINDOW** was determined to be **{best_params[0]}**, "
+                    f"with a PALLET SIZE of **46** for **postcodes**: {selected_postcodes} and **customers**: {selected_customers}."
+                    f"These optimizations resulted in SIGNIFICANT EFFICIENCY IMPROVEMENTS:\n\n"
 
-                f"**SHIPMENT WINDOW**: The most effective shipment window was identified as ****{best_params[0]} DAYS**.\n\n"
+                    f"**SHIPMENT WINDOW**: The most effective shipment window was identified as **{best_params[0]} DAYS**.\n\n"
 
-                f"**COST SAVINGS**: A reduction of **£{metrics['Cost Savings']:,.1f}**, equating to an **£{metrics['Percent Savings']:.1f}%** decrease in overall transportation costs.\n\n"
+                    f"**COST SAVINGS**: A reduction of **£{metrics['Cost Savings']:,.1f}**, equating to an **£{metrics['Percent Savings']:.1f}%** decrease in overall transportation costs.\n\n"
 
-                f"**ORDER & SHIPMENT SUMMARY**:\n"
-                f"- TOTAL ORDERS PROCESSED: **{metrics['Total Orders']:,}** \n"
-                f"- TOTAL SHIPMENTS MADE: **{metrics['Total Shipments']:,}**\n\n"
+                    f"**ORDER & SHIPMENT SUMMARY**:\n"
+                    f"- **TOTAL ORDERS PROCESSED**: {metrics['Total Orders']:,} \n"
+                    f"- **TOTAL SHIPMENTS MADE**: {metrics['Total Shipments']:,}\n\n"
 
-                f"**UTILIZATION EFFICIENCY**:\n"
-                f"- AVERAGE TRUCK UTILIZATION increased to **{metrics['Average Utilization']:.1f}%**, ensuring fewer trucks operate at low capacity.\n\n"
+                    f"**UTILIZATION EFFICIENCY**:\n"
+                    f"- **AVERAGE TRUCK UTILIZATION** increased to **{metrics['Average Utilization']:.1f}%**, ensuring fewer trucks operate at low capacity.\n\n"
 
-                f"**ENVIRONMENTAL IMPACT**:\n"
-                f"- CO2 EMISSIONS REDUCTION: A decrease of **{metrics['CO2 Emission']:,.1f} Kg**, supporting sustainability efforts and reducing the carbon footprint.\n\n"
+                    f"**ENVIRONMENTAL IMPACT**:\n"
+                    f"- **CO2 EMISSIONS REDUCTION**: A decrease of **{metrics['CO2 Emission']:,.1f} Kg**, supporting sustainability efforts and reducing the carbon footprint.\n\n"
 
-                f"These optimizations not only lead to substantial COST REDUCTIONS but also enhance OPERATIONAL SUSTAINABILITY, "
-                f"allowing logistics operations to function more efficiently while MINIMIZING ENVIRONMENTAL IMPACT."
+                    f"These optimizations not only lead to substantial **COST REDUCTIONS** but also enhance **OPERATIONAL SUSTAINABILITY**, "
+                    f"allowing logistics operations to function more efficiently while **MINIMIZING ENVIRONMENTAL IMPACT**."
             )
-
             rephrase_main_text = rephrase_text(api_key, main_text)
             st.write(rephrase_main_text)
+
 
 
     # Save results and charts
@@ -934,95 +936,104 @@ def run_cost_optimization_simulation(parameters , api_key):
 
     
     # Display the Shipment Window Comparison chart
-    st.markdown("<h2 style='font-size:24px;'>Shipment Window Comparison</h2>", unsafe_allow_html=True)
+    #st.markdown("<h2 style='font-size:24px;'>Shipment Window Comparison</h2>", unsafe_allow_html=True)
+    with st.expander("SHIPMENT WINDOW COMPARISION", expanded=False):
 
-    shipment_text = (
-        f"For each shipment window:\n\n"
-        f"- Shipments are grouped together through the consolidation function.\n"
-        f"- Key performance metrics, such as cost savings, utilization, and emissions, are calculated.\n"
-        f"- The cost savings are compared across different shipment windows to identify the most efficient one.\n"
-        f"- On analyzing this data , the best shipment window is observed to be  **{best_params[0]}** days."
-    )
-    shipment_rephrase_text = rephrase_text(api_key , shipment_text)
-    st.write(shipment_rephrase_text)
+        shipment_text = (
+            f"For each shipment window:\n\n"
+            f"- Shipments are grouped together through the consolidation function.\n"
+            f"- Key performance metrics, such as cost savings, utilization, and emissions, are calculated.\n"
+            f"- The cost savings are compared across different shipment windows to identify the most efficient one.\n"
+            f"- On analyzing this data , the best shipment window is observed to be  **{best_params[0]}** days."
+        )
+        shipment_rephrase_text = rephrase_text(api_key, shipment_text)
+        st.write(shipment_rephrase_text)
 
-    # Select the best rows for each shipment window
-    best_results = results_df.loc[results_df.groupby('Shipment Window')['Percent Savings'].idxmax()]
-    
-    # Sort by Shipment Window
-    best_results = best_results.sort_values('Shipment Window')
-    
-    # Create a complete range of shipment windows from 0 to 30
-    all_windows = list(range(0, 31))
-    
-    # Create the subplot figure
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    
-    # Add the stacked bar chart
-    fig.add_trace(
-        go.Bar(
-            x=all_windows,
-            y=[best_results[best_results['Shipment Window'] == w]['Total Shipment Cost'].values[0] if w in best_results['Shipment Window'].values else 0 for w in all_windows],
-            name='Total Shipment Cost',
-            marker_color='#1f77b4'
-        )
-    )
-    
-    fig.add_trace(
-        go.Bar(
-            x=all_windows,
-            y=[best_results[best_results['Shipment Window'] == w]['Cost Savings'].values[0] if w in best_results['Shipment Window'].values else 0 for w in all_windows],
-            name='Cost Savings',
-            marker_color='#a9d6a9'
-        )
-    )
-    
-    # Add the line chart for Total Shipments on secondary y-axis
-    fig.add_trace(
-        go.Scatter(
-            x=all_windows,
-            y=[best_results[best_results['Shipment Window'] == w]['Total Shipments'].values[0] if w in best_results['Shipment Window'].values else None for w in all_windows],
-            name='Total Shipments',
-            mode='lines+markers',
-            line=dict(color='#ff7f0e', width=2),
-            marker=dict(size=8),
-            hovertemplate='<b>Shipment Window</b>: %{x}<br>' +
-                            '<b>Total Shipments</b>: %{y}<br>' +
-                            '<b>Average Utilization</b>: %{text:.1f}%<extra></extra>',
-            text=[best_results[best_results['Shipment Window'] == w]['Average Utilization'].values[0] if w in best_results['Shipment Window'].values else None for w in all_windows],
-        ),
-        secondary_y=True
-    )
-    
-    # Add text annotations for Percent Savings
-    for w in all_windows:
-        if w in best_results['Shipment Window'].values:
-            row = best_results[best_results['Shipment Window'] == w].iloc[0]
-            fig.add_annotation(
-                x=w,
-                y=row['Total Shipment Cost'] + row['Cost Savings'],
-                text=f"{row['Percent Savings']:.1f}%",
-                showarrow=False,
-                yanchor='bottom',
-                yshift=5,
-                font=dict(size=10)
+        # Select the best rows for each shipment window
+        best_results = results_df.loc[results_df.groupby('Shipment Window')['Percent Savings'].idxmax()]
+
+        # Sort by Shipment Window
+        best_results = best_results.sort_values('Shipment Window')
+
+        # Create a complete range of shipment windows from 0 to 30
+        all_windows = list(range(0, 31))
+
+        # Create the subplot figure
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+        # Add the stacked bar chart
+        fig.add_trace(
+            go.Bar(
+                x=all_windows,
+                y=[best_results[best_results['Shipment Window'] == w]['Total Shipment Cost'].values[0] if w in
+                                                                                                          best_results[
+                                                                                                              'Shipment Window'].values else 0
+                   for w in all_windows],
+                name='Total Shipment Cost',
+                marker_color='#1f77b4'
             )
-    
-    # Update the layout
-    fig.update_layout(
-        barmode='stack',
-        height=600,
-        width=1050,
-        # margin=dict(l=50, r=50, t=40, b=20),
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
-    )
-    
-    fig.update_xaxes(title_text='Shipment Window', tickmode='linear', dtick=1, range=[-0.5, 30.5])
-    fig.update_yaxes(title_text='Cost (£)', secondary_y=False)
-    fig.update_yaxes(title_text='Total Shipments', secondary_y=True)
-    
-    # Show the chart
-    st.plotly_chart(fig, use_container_width=False)
+        )
+
+        fig.add_trace(
+            go.Bar(
+                x=all_windows,
+                y=[best_results[best_results['Shipment Window'] == w]['Cost Savings'].values[0] if w in best_results[
+                    'Shipment Window'].values else 0 for w in all_windows],
+                name='Cost Savings',
+                marker_color='#a9d6a9'
+            )
+        )
+
+        # Add the line chart for Total Shipments on secondary y-axis
+        fig.add_trace(
+            go.Scatter(
+                x=all_windows,
+                y=[best_results[best_results['Shipment Window'] == w]['Total Shipments'].values[0] if w in best_results[
+                    'Shipment Window'].values else None for w in all_windows],
+                name='Total Shipments',
+                mode='lines+markers',
+                line=dict(color='#ff7f0e', width=2),
+                marker=dict(size=8),
+                hovertemplate='<b>Shipment Window</b>: %{x}<br>' +
+                              '<b>Total Shipments</b>: %{y}<br>' +
+                              '<b>Average Utilization</b>: %{text:.1f}%<extra></extra>',
+                text=[best_results[best_results['Shipment Window'] == w]['Average Utilization'].values[0] if w in
+                                                                                                             best_results[
+                                                                                                                 'Shipment Window'].values else None
+                      for w in all_windows],
+            ),
+            secondary_y=True
+        )
+
+        # Add text annotations for Percent Savings
+        for w in all_windows:
+            if w in best_results['Shipment Window'].values:
+                row = best_results[best_results['Shipment Window'] == w].iloc[0]
+                fig.add_annotation(
+                    x=w,
+                    y=row['Total Shipment Cost'] + row['Cost Savings'],
+                    text=f"{row['Percent Savings']:.1f}%",
+                    showarrow=False,
+                    yanchor='bottom',
+                    yshift=5,
+                    font=dict(size=10)
+                )
+
+        # Update the layout
+        fig.update_layout(
+            barmode='stack',
+            height=600,
+            width=1050,
+            # margin=dict(l=50, r=50, t=40, b=20),
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+        )
+
+        fig.update_xaxes(title_text='Shipment Window', tickmode='linear', dtick=1, range=[-0.5, 30.5])
+        fig.update_yaxes(title_text='Cost (£)', secondary_y=False)
+        fig.update_yaxes(title_text='Total Shipments', secondary_y=True)
+
+        # Show the chart
+        st.plotly_chart(fig, use_container_width=False)
 
     # Return results
     return {
@@ -1033,7 +1044,7 @@ def run_cost_optimization_simulation(parameters , api_key):
     }
 
 # # Calculation tab
-def cost_calculation(parameters, best_params):
+def cost_calculation(parameters, best_params , total_capacity):
 
     df = pd.read_excel('Complete Input.xlsx', sheet_name='Sheet1')
     df['SHIPPED_DATE'] = pd.to_datetime(df['SHIPPED_DATE'], dayfirst=True)
@@ -1068,7 +1079,7 @@ def cost_calculation(parameters, best_params):
             for i, ((prod_type, group), group_df) in enumerate(grouped):
                 consolidated_shipments, allocation_matrix = consolidate_shipments(
                     group_df, calc_high_priority_limit, calc_utilization_threshold,
-                    calc_shipment_window, date_range, lambda: None, total_shipment_capacity
+                    calc_shipment_window, date_range, lambda: None, total_capacity
                 )
                 all_consolidated_shipments.extend(consolidated_shipments)
                 all_allocation_matrices.append(allocation_matrix)
