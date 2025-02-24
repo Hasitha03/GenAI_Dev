@@ -16,3 +16,4 @@ plotly
 pyecharts
 openpyxl
 guardrails-ai
+fuzzywuzzy
