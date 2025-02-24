@@ -19,6 +19,10 @@ import soundfile as sf
 import numpy as np
 import tempfile
 from openai import OpenAI
+import guardrails as gd
+from guardrails import Guard, OnFailAction
+from guardrails.validator_base import Validator, PassResult, FailResult, register_validator
+from fuzzywuzzy import fuzz
 
 # Streamlit app configuration
 st.set_page_config(
@@ -27,7 +31,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
 
 logo = Image.open("Images/perrigo-logo.png")
 st.image(logo, width=120)
@@ -360,9 +363,119 @@ Query:
         st.error(f"Error during analysis: {e}")
         return None
 
+Description_of_Data = """
+This dataset contains information about shipping orders, including:
+- Order ID
+- Number of pallets
+- Shipping cost
+- Distance traveled
+- Product type (PROD_TYPE)
+- Destination postcode (SHORT_POSTCODE)
+- Cost savings
+
+The dataset can be used to answer questions about:
+- Total orders and pallets
+- Average shipping cost and distance
+- Most common product types
+- Delivery performance over time
+- Cost savings for customers or postcodes
+"""
+
+sample_queries = [
+    "What is the monthly trend in total cost?",
+    "What is the average cost per pallet for each PROD TYPE and how does it vary across the following SHORT_POSTCODE regions: CV, NG, NN, RG?",
+    "Which customer has the highest total shipping cost over time, and how does its cost trend vary by month?",
+    "Identify the SHORT_POSTCODE areas with the highest total shipping costs and also mention their cost per pallet.",
+    "For ambient product type, which are the top 5 customers with total orders > 10 and highest standard deviation in cost per pallet?",
+    "How does the cost per order vary with distance within each PROD TYPE?",
+    "How can I optimize the shipment costs for user ALLOGA UK in January?",
+    "What is the cost saving for postal codes NG, LU and NN in Feb 2024 if we consolidate?",
+    "How can we save spends for Tesco grocery dept in the month of March?",
+    "How can I improve my cost savings for first quarter of 2024 for customer Sainsbury's Supermarket?",
+    "How can we optimise spends for customer Boots Company PLC for the month of Feb to maximise efficiency?",
+    "What are the best ways to reduce shipment costs for B & M Ltd Retail while maintaining service efficiency?"
+]
+
+
+@register_validator(name="check_relevance", data_type="string")
+class RelevanceValidator(Validator):
+    def __init__(self, on_fail=None):
+        super().__init__(on_fail=on_fail)
+        self.dataset_description = Description_of_Data.lower()
+        self.sample_questions = [q.lower() for q in sample_queries]
+
+        self.negative_keywords = [
+            "advertisement", "google", "social media", "marketing",
+            "website", "seo", "click", "impression", "campaign"
+        ]
+
+        # 🟢 Required context keywords from shipping domain
+        self.required_context = [
+            "shipping", "pallet", "postcode", "prod type",
+            "customer", "consolidate", "distance", "destination",
+            "cost saving", "order id", "shipment"
+        ]
+
+    def _validate(self, value, metadata=None):
+        query = value.lower()
+
+        if any(nk in query for nk in self.negative_keywords):
+            #st.write(f"🚫 Blocked by negative keywords")
+            return FailResult("Query about unrelated domain (ads/marketing)")
+
+            # 2️⃣ Second check: Must contain shipping-related context
+        if not any(rc in query for rc in self.required_context):
+            #st.write(f"🚫 Missing required shipping context")
+            return FailResult("Query lacks shipping-specific terminology")
+
+            # 3️⃣ Third check: Dataset keyword alignment
+        dataset_keywords = ["cost saving", "order", "distance",
+                            "prod_type", "short_postcode", "customer" ,"postcodes"]
+        if not any(kw in query for kw in dataset_keywords):
+            #st.write(f"🚫 No dataset-specific keywords found")
+            return FailResult("Query doesn't reference dataset columns")
+
+        max_similarity = max(fuzz.ratio(query, q) for q in self.sample_questions)
+        if max_similarity < 60:  # More strict threshold
+            st.write(f"🚫 No similar sample questions ({max_similarity}%)")
+            return FailResult("Query pattern doesn't match known use cases")
+
+        keywords = self.dataset_description.replace("\n", " ").split(" ")
+        keywords = [word.strip(".,-") for word in keywords if word.strip(".,-")]
+
+        # Check if any keyword is in the query
+        if any(keyword in query for keyword in keywords):
+            st.write("✅ Query matches dataset description.")
+            return PassResult()
+
+        # ✅ Fuzzy Matching with Sample Questions (Threshold 80 for High Similarity)
+        for question in self.sample_questions:
+            similarity_score = fuzz.ratio(query, question)
+            if similarity_score > 80:  # 80% or higher similarity
+                st.write(f"✅ Query matches a sample question ({similarity_score}% similarity).")
+                return PassResult()
+
+        st.write("🚫 Query is NOT relevant.")  # Debug log
+        return FailResult(error_message="Query is unrelated to your dataset.")
+
 
 def analyze_data_with_execution(df, question, api_key, data_source):
     # Get the appropriate prompt file based on data source
+    validators = [RelevanceValidator(on_fail=OnFailAction.EXCEPTION)]
+
+    # Use `use_many()` instead of `from_string()`
+    guard = Guard.for_string(validators)
+    #guard = Guard.from_string(validators=[RelevanceValidator(on_fail=OnFailAction.EXCEPTION)])
+
+    # Validate the relevance of the question
+    try:
+        guard.validate(question, metadata={})
+    except Exception as e:
+        st.write("🚫 The question is NOT relevant to the dataset. Please ask a relevant question.")
+        return None  # Stop execution if the question is not relevant
+
+    # If the question is relevant, proceed with the analysis
+
     prompt_file = get_prompt_file(data_source)
 
     if not prompt_file:
@@ -557,20 +670,19 @@ def get_sample_queries(data_source):
     """Return appropriate sample queries based on the selected data source."""
     queries = {
         'Outbound_Data.csv': [
-
-    "What is the monthly trend in total cost?",
-    "What is the average cost per pallet for each PROD TYPE and how does it vary across the following SHORT_POSTCODE regions: CV, NG, NN, RG?",
-    "Which customer has the highest total shipping cost over time, and how does its cost trend vary by month?",
-    "Identify the SHORT_POSTCODE areas with the highest total shipping costs and also mention their cost per pallet.",
-    "For ambient product type, which are the top 5 customers with total orders > 10 and highest standard deviation in cost per pallet?",
-    "How does the cost per order vary with distance within each PROD TYPE?",
-    "How can I optimize the shipment costs for user ALLOGA UK in January?",
-    "What is the cost saving for postal codes NG, LU and NN in Feb 2024 if we consolidate?",
-    "How can we save spends for Tesco grocery dept in the month of March?",
-    "How can I improve my cost savings for first quarter of 2024 for customer Sainsbury's Supermarket?",
-    "How can we optimise spends for customer Boots Company PLC for the month of Feb to maximise efficiency?",
-    "What are the best ways to reduce shipment costs for B & M Ltd Retail while maintaining service efficiency?"
-        ],
+            "What is the monthly trend in total cost?",
+            "What is the average cost per pallet for each PROD TYPE and how does it vary across the following SHORT_POSTCODE regions: CV, NG, NN, RG?",
+            "Which customer has the highest total shipping cost over time, and how does its cost trend vary by month?",
+            "Identify the SHORT_POSTCODE areas with the highest total shipping costs and also mention their cost per pallet.",
+            "For ambient product type, which are the top 5 customers with total orders > 10 and highest standard deviation in cost per pallet?",
+            "How does the cost per order vary with distance within each PROD TYPE?",
+            "How can I optimize the shipment costs for user ALLOGA UK in January?",
+            "What is the cost saving for postal codes NG, LU and NN in Feb 2024 if we consolidate?",
+            "How can we save spends for Tesco grocery dept in the month of March?",
+            "How can I improve my cost savings for first quarter of 2024 for customer Sainsbury's Supermarket?",
+            "How can we optimise spends for customer Boots Company PLC for the month of Feb to maximise efficiency?",
+            "What are the best ways to reduce shipment costs for B & M Ltd Retail while maintaining service efficiency?"
+         ],
         'Inventory_Batch.csv': [
             "What is the total inventory value by product category?",
             "Which products have inventory levels below their safety stock?",
@@ -823,6 +935,15 @@ def main():
                 )
             elif intent == 'Cost Optimization':
                 results = None
+                if 'results' in st.session_state:
+                    del st.session_state.results
+                if 'selected_postcodes' in st.session_state:
+                    del st.session_state.selected_postcodes
+                if 'selected_customers' in st.session_state:
+                    del st.session_state.selected_customers
+                if 'parameters' in st.session_state:
+                    del st.session_state.parameters
+
                 st.session_state.show_cost_options = True
 
             if results and intent != 'Cost Optimization':
@@ -877,6 +998,20 @@ def main():
             elif consolidation_approach == "Dynamic":
                 st.session_state.dynamic_clicked = True
                 st.write("You have selected the **Dynamic** way of approaching the query.")
+
+                file_path = 'Complete Input.xlsx' # Change this to your actual file path
+                pallet_file ='Cost per pallet.xlsx'
+                df = pd.read_excel(file_path)
+                dff = pd.read_excel(pallet_file)
+                columns_to_remove = ["SHIPPED_DATE", "Total Pallets" ,"Distance"]  # Replace with actual column names
+                df_filtered = df.drop(columns=columns_to_remove)
+                df_filtered["ORDER_ID"] = df_filtered["ORDER_ID"].astype(str)
+                # Display in Streamlit
+                with st.expander("📂  Other files used ", expanded=False):
+                    st.dataframe(df_filtered.head())
+                    st.write("~ **Cost per each pallet for different postcodes** ⬇️")
+                    st.dataframe(dff.head())
+
                 col1, col2, col3 = st.columns(3)
 
                 with col1:
@@ -918,7 +1053,6 @@ def main():
                     if not all_postcodes:
                         postcode_counts = data_df['SHORT_POSTCODE'].value_counts()
                         postcode_options = postcode_counts.index.tolist()
-                        #default_postcodes = [postcode for postcode in postcodes if postcode in postcode_options]
                         selected_postcodes = st.multiselect(
                             "Select Post Codes",
                             options=postcode_options,
@@ -933,11 +1067,10 @@ def main():
                     if not all_customers:
                         customer_counts = data_df['NAME'].value_counts()
                         customer_options = customer_counts.index.tolist()
-                        #default_customers = [customer for customer in customers if customer in customer_options]
                         selected_customers = st.multiselect(
                             "Select Customers",
                             options=customer_options,
-                            default=st.session_state.selected_customers,  # Select all customers by default
+                            default=st.session_state.selected_customers,
                             format_func=lambda x: f"{x} ({customer_counts[x]})"
                         )
                         st.session_state.selected_customers = selected_customers
@@ -958,8 +1091,7 @@ def main():
                             #parameters = parameter_values.get_parameters_values(api_key, query)
 
                             st.session_state.results = cost_cosnsolidation.run_cost_optimization_simulation(st.session_state.parameters,
-                                                                                                            api_key , total_capacity =st.session_state.total_shipment_capacity,
-                    shipment_window = st.session_state.shipment_window_range)
+                                                                                                            api_key , total_capacity =st.session_state.total_shipment_capacity,shipment_window = st.session_state.shipment_window_range , customers = st.session_state.selected_customers ,postcodes = st.session_state.selected_postcodes )
                             cost_cosnsolidation.cost_calculation(st.session_state.parameters, st.session_state.results['params'] ,total_capacity =st.session_state.total_shipment_capacity)
 
 

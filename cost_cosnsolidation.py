@@ -42,7 +42,7 @@ def rephrase_text(api_key, text):
     # Set the API key
     openai.api_key = api_key
 
-    instructions = "Rephrase the given text while maintaining clarity, professionalism, and conciseness."
+    instructions = "Rephrase the given text in a unique and varied way while maintaining clarity, professionalism, and conciseness. Ensure the response is distinct from previous attempts."
 
     try:
         # Call OpenAI's API for rephrasing
@@ -54,7 +54,7 @@ def rephrase_text(api_key, text):
                 {"role": "user", "content": text}
             ],
             max_tokens=500,  # Adjust based on your text size
-            temperature=0.7  # Balance creativity and accuracy
+            temperature=1.2 # Balance creativity and accuracy
         )
 
         # Extract and return the rephrased text
@@ -620,54 +620,6 @@ def analyze_consolidation_distribution(all_consolidated_shipments, df):
     return distribution, distribution_percentage
 
 
-def custom_progress_bar():
-    progress_container = st.empty()
-    
-    def render_progress(percent):
-        progress_html = f"""
-        <style>
-            .overall-container {{
-                width: 100%;
-                position: relative;
-                padding-top: 30px; /* Reduced space for the truck */
-            }}
-            .progress-container {{
-                width: 100%;
-                height: 8px;
-                background-color: #bbddff;
-                border-radius: 10px;
-                position: relative;
-                overflow: hidden;
-            }}
-            .progress-bar {{
-                width: {percent}%;
-                height: 100%;
-                background-color: #0053a4;
-                border-radius: 10px;
-                transition: width 0.5s ease-in-out;
-            }}
-            .truck-icon {{
-                position: absolute;
-                top: 0;
-                left: calc({percent}% - 15px);
-                transition: left 0.5s ease-in-out;
-            }}
-        </style>
-        <div class="overall-container">
-            <div class="truck-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" width="30" height="30">
-                    <path fill="#0053a4" d="M624 352h-16V243.9c0-12.7-5.1-24.9-14.1-33.9L494 110.1c-9-9-21.2-14.1-33.9-14.1H416V48c0-26.5-21.5-48-48-48H48C21.5 0 0 21.5 0 48v320c0 26.5 21.5 48 48 48h16c0 53 43 96 96 96s96-43 96-96h128c0 53 43 96 96 96s96-43 96-96h48c8.8 0 16-7.2 16-16v-32c0-8.8-7.2-16-16-16zm-464 96c-26.5 0-48-21.5-48-48s21.5-48 48-48 48 21.5 48 48-21.5 48-48 48zm208-96H242.7c-16.6-28.6-47.2-48-82.7-48s-66.1 19.4-82.7 48H48V48h352v304zm96 96c-26.5 0-48-21.5-48-48s21.5-48 48-48 48 21.5 48 48-21.5 48-48 48zm80-96h-16.7c-16.6-28.6-47.2-48-82.7-48-29.2 0-55.1 14.2-71.3 36-3.1-1.9-6.4-3.5-9.9-4.7V144h80.9c4.7 0 9.2 1.9 12.5 5.2l100.2 100.2c2.1 2.1 3.3 5 3.3 8v95.8z"/>
-                </svg>
-            </div>
-            <div class="progress-container">
-                <div class="progress-bar"></div>
-            </div>
-        </div>
-        """
-        progress_container.markdown(progress_html, unsafe_allow_html=True)
-    
-    return render_progress
-
 
 def create_metric_box(label, value, color_start="#1f77b4", color_end="#0053a4"):
     html = f"""
@@ -724,7 +676,7 @@ div.stDownloadButton > button:hover {
 
     
 # Simulation tab
-def run_cost_optimization_simulation(parameters , api_key , total_capacity,shipment_window):
+def run_cost_optimization_simulation(parameters , api_key , total_capacity,shipment_window , customers , postcodes):
 
     start_date= parameters['start_date']
     end_date= parameters['end_date']
@@ -871,7 +823,7 @@ def run_cost_optimization_simulation(parameters , api_key , total_capacity,shipm
             all_allocation_matrices = []
 
             # Run calculation
-            #progress_bar = custom_progress_bar()
+
 
             for i, ((prod_type, group), group_df) in enumerate(grouped):
                 consolidated_shipments, allocation_matrix = consolidate_shipments(
@@ -883,8 +835,8 @@ def run_cost_optimization_simulation(parameters , api_key , total_capacity,shipm
                 #progress_percentage = int(((i + 1) / len(grouped)) * 100)
                 #progress_bar(progress_percentage)
 
-            selected_postcodes = ", ".join(parameters["selected_postcodes"]) if parameters["selected_postcodes"] else "All Postcodes"
-            selected_customers = ", ".join(parameters["selected_customers"]) if parameters["selected_customers"] else "All Customers"
+            selected_postcodes = ", ".join(postcodes) if postcodes else "All Postcodes"
+            selected_customers = ", ".join(customers) if customers else "All Customers"
 
             metrics = calculate_metrics(all_consolidated_shipments, df)
 
@@ -892,7 +844,7 @@ def run_cost_optimization_simulation(parameters , api_key , total_capacity,shipm
         with st.expander("IDENTIFIED COST SAVINGS AND KEY PERFORMANCE INDICATORS(KPIs)", expanded=False):
             main_text = (
                     f"Through extensive analysis, the **OPTIMAL SHIPMENT WINDOW** was determined to be **{best_params[0]}**, "
-                    f"with a PALLET SIZE of **46** for **postcodes**: {selected_postcodes} and **customers**: {selected_customers}."
+                    f"with a PALLET SIZE of **{total_capacity}** for **postcodes**: {selected_postcodes} and **customers**: {selected_customers}."
                     f"These optimizations resulted in SIGNIFICANT EFFICIENCY IMPROVEMENTS:\n\n"
 
                     f"**SHIPMENT WINDOW**: The most effective shipment window was identified as **{best_params[0]} DAYS**.\n\n"
