@@ -50,6 +50,7 @@ st.markdown("""
 
 import parameter_values
 import cost_cosnsolidation
+import static
 
 
 # Initialize session state for audio recording and transcribed text
@@ -397,6 +398,67 @@ sample_queries = [
 ]
 
 
+# @register_validator(name="check_relevance", data_type="string")
+# class RelevanceValidator(Validator):
+#     def __init__(self, on_fail=None):
+#         super().__init__(on_fail=on_fail)
+#         self.dataset_description = Description_of_Data.lower()
+#         self.sample_questions = [q.lower() for q in sample_queries]
+#
+#         self.negative_keywords = [
+#             "advertisement", "google", "social media", "marketing",
+#             "website", "seo", "click", "impression", "campaign"
+#         ]
+#
+#         # 🟢 Required context keywords from shipping domain
+#         self.required_context = [
+#             "shipping", "pallet", "postcode", "prod type",
+#             "customer", "consolidate", "distance", "destination",
+#             "cost saving", "order id", "shipment"
+#         ]
+#
+#     def _validate(self, value, metadata=None):
+#         query = value.lower()
+#
+#         if any(nk in query for nk in self.negative_keywords):
+#             #st.write(f"🚫 Blocked by negative keywords")
+#             return FailResult("Query about unrelated domain (ads/marketing)")
+#
+#             # 2️⃣ Second check: Must contain shipping-related context
+#         if not any(rc in query for rc in self.required_context):
+#             #st.write(f"🚫 Missing required shipping context")
+#             return FailResult("Query lacks shipping-specific terminology")
+#
+#             # 3️⃣ Third check: Dataset keyword alignment
+#         dataset_keywords = ["cost saving", "order", "distance",
+#                             "prod_type", "short_postcode", "customer" ,"postcodes"]
+#         if not any(kw in query for kw in dataset_keywords):
+#             #st.write(f"🚫 No dataset-specific keywords found")
+#             return FailResult("Query doesn't reference dataset columns")
+#
+#         max_similarity = max(fuzz.ratio(query, q) for q in self.sample_questions)
+#         if max_similarity < 60:  # More strict threshold
+#             st.write(f"🚫 No similar sample questions ({max_similarity}%)")
+#             return FailResult("Query pattern doesn't match known use cases")
+#
+#         keywords = self.dataset_description.replace("\n", " ").split(" ")
+#         keywords = [word.strip(".,-") for word in keywords if word.strip(".,-")]
+#
+#         # Check if any keyword is in the query
+#         if any(keyword in query for keyword in keywords):
+#             st.write("✅ Query matches dataset description.")
+#             return PassResult()
+#
+#         # ✅ Fuzzy Matching with Sample Questions (Threshold 80 for High Similarity)
+#         for question in self.sample_questions:
+#             similarity_score = fuzz.ratio(query, question)
+#             if similarity_score > 80:  # 80% or higher similarity
+#                 st.write(f"✅ Query matches a sample question ({similarity_score}% similarity).")
+#                 return PassResult()
+#
+#         st.write("🚫 Query is NOT relevant.")  # Debug log
+#         return FailResult(error_message="Query is unrelated to your dataset.")
+
 @register_validator(name="check_relevance", data_type="string")
 class RelevanceValidator(Validator):
     def __init__(self, on_fail=None):
@@ -404,66 +466,67 @@ class RelevanceValidator(Validator):
         self.dataset_description = Description_of_Data.lower()
         self.sample_questions = [q.lower() for q in sample_queries]
 
+        # Negative keywords to block irrelevant questions
         self.negative_keywords = [
             "advertisement", "google", "social media", "marketing",
-            "website", "seo", "click", "impression", "campaign"
+            "website", "click", "impression", "campaign"
         ]
 
-        # 🟢 Required context keywords from shipping domain
+        # Required context keywords from shipping domain
         self.required_context = [
             "shipping", "pallet", "postcode", "prod type",
             "customer", "consolidate", "distance", "destination",
             "cost saving", "order id", "shipment"
         ]
 
+        # Dataset-specific keywords
+        self.dataset_keywords = [
+            "cost saving", "order", "distance",
+            "prod_type", "short_postcode", "customer", "postcodes"
+        ]
+
     def _validate(self, value, metadata=None):
         query = value.lower()
 
+        # 1️⃣ First check: Block questions with negative keywords
         if any(nk in query for nk in self.negative_keywords):
-            #st.write(f"🚫 Blocked by negative keywords")
+            st.write(f"🚫 Blocked by negative keywords")
             return FailResult("Query about unrelated domain (ads/marketing)")
 
-            # 2️⃣ Second check: Must contain shipping-related context
-        if not any(rc in query for rc in self.required_context):
-            #st.write(f"🚫 Missing required shipping context")
-            return FailResult("Query lacks shipping-specific terminology")
+        # 2️⃣ Second check: Must contain at least TWO shipping-related keywords
+        shipping_keywords_found = sum(rc in query for rc in self.required_context)
+        if shipping_keywords_found < 2:  # Require at least 2 relevant keywords
+            st.write(f"🚫 Missing required shipping context")
+            return FailResult("Query lacks sufficient shipping-specific terminology")
 
-            # 3️⃣ Third check: Dataset keyword alignment
-        dataset_keywords = ["cost saving", "order", "distance",
-                            "prod_type", "short_postcode", "customer" ,"postcodes"]
-        if not any(kw in query for kw in dataset_keywords):
-            #st.write(f"🚫 No dataset-specific keywords found")
+        # 3️⃣ Third check: Dataset keyword alignment
+        dataset_keywords_found = sum(kw in query for kw in self.dataset_keywords)
+        if dataset_keywords_found < 2:  # Require at least 2 dataset-specific keywords
+            st.write(f"🚫 No dataset-specific keywords found")
             return FailResult("Query doesn't reference dataset columns")
 
+        # 4️⃣ Fourth check: Fuzzy Matching with Sample Questions (Strict Threshold)
         max_similarity = max(fuzz.ratio(query, q) for q in self.sample_questions)
-        if max_similarity < 60:  # More strict threshold
+        if max_similarity < 70:  # Increased threshold for stricter matching
             st.write(f"🚫 No similar sample questions ({max_similarity}%)")
             return FailResult("Query pattern doesn't match known use cases")
 
+        # 5️⃣ Fifth check: Semantic relevance to dataset description
         keywords = self.dataset_description.replace("\n", " ").split(" ")
         keywords = [word.strip(".,-") for word in keywords if word.strip(".,-")]
+        if not any(keyword in query for keyword in keywords):
+            st.write("🚫 Query doesn't match dataset description.")
+            return FailResult("Query is unrelated to your dataset.")
 
-        # Check if any keyword is in the query
-        if any(keyword in query for keyword in keywords):
-            st.write("✅ Query matches dataset description.")
-            return PassResult()
-
-        # ✅ Fuzzy Matching with Sample Questions (Threshold 80 for High Similarity)
-        for question in self.sample_questions:
-            similarity_score = fuzz.ratio(query, question)
-            if similarity_score > 80:  # 80% or higher similarity
-                st.write(f"✅ Query matches a sample question ({similarity_score}% similarity).")
-                return PassResult()
-
-        st.write("🚫 Query is NOT relevant.")  # Debug log
-        return FailResult(error_message="Query is unrelated to your dataset.")
+        # ✅ If all checks pass, the query is relevant
+        st.write("✅ Query is relevant.")
+        return PassResult()
 
 
 def analyze_data_with_execution(df, question, api_key, data_source):
     # Get the appropriate prompt file based on data source
     validators = [RelevanceValidator(on_fail=OnFailAction.EXCEPTION)]
 
-    # Use `use_many()` instead of `from_string()`
     guard = Guard.for_string(validators)
     #guard = Guard.from_string(validators=[RelevanceValidator(on_fail=OnFailAction.EXCEPTION)])
 
@@ -732,10 +795,16 @@ if "results" not in st.session_state:
     st.session_state.results = None
 if "dynamic_clicked" not in st.session_state:
     st.session_state.dynamic_clicked = False
+if "static_clicked" not in st.session_state:
+    st.session_state.static_clicked = False
 if "total_shipment_capacity" not in st.session_state:
     st.session_state.total_shipment_capacity = 46
 if "shipment_window_range" not in st.session_state:
     st.session_state.shipment_window_range = (2, 7)
+if 'delivery_options' not in st.session_state:
+    st.session_state.delivery_options = None
+if 'selected_delivery_option' not in st.session_state:
+    st.session_state.selected_delivery_option = None
 
 def reset_session_states():
     st.session_state.show_cost_options = False
@@ -991,9 +1060,89 @@ def main():
                 index = None
             )
 
+
+
             if consolidation_approach == "Static":
+                st.session_state.static_clicked = True
+
+                @st.cache_data
+                def load_data():
+                    df = pd.read_excel('Complete Input.xlsx', sheet_name='Sheet1')
+                    rate_card = pd.read_excel('Cost per pallet.xlsx')
+                    df['SHIPPED_DATE'] = pd.to_datetime(df['SHIPPED_DATE'], dayfirst=True)
+                    rate_card_ambient = pd.read_excel('Complete Input.xlsx', sheet_name='AMBIENT')
+                    rate_card_ambcontrol = pd.read_excel('Complete Input.xlsx', sheet_name='AMBCONTROL')
+                    return df, rate_card, rate_card_ambient, rate_card_ambcontrol
+
+                    # Rename df to avoid conflicts
+
+                data_df, rate_card, rate_card_ambient, rate_card_ambcontrol = load_data()
+
                 st.session_state.dynamic_clicked = False
                 st.write("You have selected the **Static** way of approaching the query. Here's the suitable result.")
+                st.write("Choose number of delivery day scenarios")
+
+                delivery_options = st.radio(
+                    "Select an approach:",
+                    options=["5 days delivery scenario", "4 days delivery scenario", "3 days delivery scenario",
+                             "2 days delivery scenario",
+                             "1 day delivery scenario"],
+                    key="delivery_options",
+                    index=None
+                )
+
+                # Update session state with the selected delivery option
+                if delivery_options:
+                    st.session_state.selected_delivery_option = delivery_options
+
+                # Display the selected delivery option
+                if st.session_state.selected_delivery_option:
+                    st.write(f"You have selected {st.session_state.selected_delivery_option}")
+
+                    # Define the delivery scenarios
+                    scenarios = {
+                        "5 days delivery scenario": [
+                            "Mon_Tue_Wed_Thu_Fri", "Mon_Tue_Wed_Thu_Sat", "Mon_Tue_Wed_Thu_Sun",
+                            "Mon_Tue_Wed_Fri_Sat", "Mon_Tue_Wed_Fri_Sun", "Mon_Tue_Thu_Fri_Sat",
+                            "Mon_Tue_Thu_Fri_Sun", "Mon_Wed_Thu_Fri_Sat", "Mon_Wed_Thu_Fri_Sun",
+                            "Tue_Wed_Thu_Fri_Sat", "Tue_Wed_Thu_Fri_Sun"
+                        ],
+                        "4 days delivery scenario": [
+                            "Mon_Tue_Wed_Thu", "Mon_Tue_Wed_Fri", "Mon_Tue_Wed_Sat", "Mon_Tue_Wed_Sun",
+                            "Mon_Tue_Thu_Fri", "Mon_Tue_Thu_Sat", "Mon_Tue_Thu_Sun", "Mon_Wed_Thu_Fri",
+                            "Mon_Wed_Thu_Sat", "Mon_Wed_Thu_Sun", "Tue_Wed_Thu_Fri", "Tue_Wed_Thu_Sat",
+                            "Tue_Wed_Thu_Sun"
+                        ],
+                        "3 days delivery scenario": [
+                            "Mon_Tue_Wed", "Mon_Tue_Thu", "Mon_Tue_Fri", "Mon_Tue_Sat", "Mon_Tue_Sun",
+                            "Mon_Wed_Thu", "Mon_Wed_Fri", "Mon_Wed_Sat", "Mon_Wed_Sun",
+                            "Tue_Wed_Thu", "Tue_Wed_Fri", "Tue_Wed_Sat", "Tue_Wed_Sun"
+                        ],
+                        "2 days delivery scenario": [
+                            "Mon_Tue", "Mon_Wed", "Mon_Thu", "Mon_Fri", "Mon_Sat", "Mon_Sun",
+                            "Tue_Wed", "Tue_Thu", "Tue_Fri", "Tue_Sat", "Tue_Sun",
+                            "Wed_Thu", "Wed_Fri", "Wed_Sat", "Wed_Sun"
+                        ],
+                        "1 day delivery scenario": [
+                            "Only_Mon", "Only_Tue", "Only_Wed", "Only_Thu", "Only_Fri", "Only_Sat", "Only_Sun"
+                        ]
+                    }
+
+                    # Display the scenarios based on the selected delivery option
+                    selected_scenarios = scenarios.get(st.session_state.selected_delivery_option, [])
+
+                    if selected_scenarios:
+                        st.write(
+                            f"The possible {st.session_state.selected_delivery_option.split()[0]}-day scenarios are : ")
+                        scenarios_single_line = " ,  &nbsp;&nbsp;&nbsp;".join(selected_scenarios)
+                        st.write(scenarios_single_line)
+                        st.write(" ")
+
+                        if 'parameters' not in st.session_state:
+                            st.session_state.parameters = parameter_values.get_parameters_values(api_key, query)
+
+                        static.find_cost_savings(data_df, rate_card, selected_scenarios ,parameters=st.session_state.parameters)
+
 
             elif consolidation_approach == "Dynamic":
                 st.session_state.dynamic_clicked = True

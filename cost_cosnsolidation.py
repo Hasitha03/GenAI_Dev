@@ -334,39 +334,6 @@ def create_utilization_chart(all_consolidated_shipments):
 
     return fig
 
-# def create_pallet_distribution_chart(all_consolidated_shipments, total_shipment_capacity):
-#     # Create bins with 5-pallet intervals
-#     bin_size = 5
-#     num_bins = (total_shipment_capacity + bin_size - 1) // bin_size  # Round up to nearest bin
-#     pallet_bins = {f"{i*bin_size+1}-{min((i+1)*bin_size, total_shipment_capacity)}": 0 for i in range(num_bins)}
-#
-#     for shipment in all_consolidated_shipments:
-#         total_pallets = shipment['Total Pallets']
-#         for bin_range, count in pallet_bins.items():
-#             low, high = map(int, bin_range.split('-'))
-#             if low <= total_pallets <= high:
-#                 pallet_bins[bin_range] += 1
-#                 break
-#
-#     total_shipments = len(all_consolidated_shipments)
-#     pallet_distribution = {bin: (count / total_shipments) * 100 for bin, count in pallet_bins.items()}
-#
-#     # Sort the bins to ensure they're in the correct order
-#     sorted_bins = sorted(pallet_distribution.items(), key=lambda x: int(x[0].split('-')[0]))
-#
-#     fig = go.Figure(data=[go.Bar(x=[bin for bin, _ in sorted_bins],
-#                                  y=[value for _, value in sorted_bins],
-#                                  marker_color='#1f77b4')])
-#     fig.update_layout(
-#         title={'text': 'Pallet Distribution', 'font': {'size': 22, 'weight': 'normal'}},
-#         xaxis_title='Pallet Range',
-#         yaxis_title='Percentage of Shipments',
-#         xaxis=dict(tickangle=0),
-#         width=600,
-#         height=500
-#     )
-#     return fig
-
 
 def create_consolidated_shipments_calendar(consolidated_df):
     # Group by Date and calculate both Shipments Count and Total Orders
@@ -871,11 +838,6 @@ def run_cost_optimization_simulation(parameters , api_key , total_capacity,shipm
 
     # Save results and charts
     utilization_chart = create_utilization_chart(best_consolidated_shipments)
-    # utilization_chart.write_image("utilization_chart.png")
-    
-    # results_df = pd.DataFrame(all_results)
-    # results_df.to_csv("simulation_results.csv", index=True)
-
 
     # Create a dataframe with all simulation results
     results_df = pd.DataFrame(all_results)
@@ -1044,28 +1006,6 @@ def cost_calculation(parameters, best_params , total_capacity):
             # time_taken_seconds = int(time_taken % 60)
             # st.write(f"Time taken: {time_taken_minutes} minutes {time_taken_seconds} seconds")
 
-            # Calculate and display metrics
-            #metrics = calculate_metrics(all_consolidated_shipments, df)
-
-            # Usage example:
-            # col1, col2, col3, col4, col5, col6 = st.columns(6)
-            # with col1:
-            #     create_metric_box("Total Orders", f"{metrics['Total Orders']:,}")
-            # with col2:
-            #     create_metric_box("Total Shipments", f"{metrics['Total Shipments']:,}")
-            # with col3:
-            #     create_metric_box("Cost Savings", f"£{metrics['Cost Savings']:,.1f}")
-            # with col4:
-            #     create_metric_box("Percentage Saving", f"{metrics['Percent Savings']:.1f}%")
-            # with col5:
-            #     create_metric_box("Average Utilization", f"{metrics['Average Utilization']:.1f}%")
-            # with col6:
-            #     create_metric_box("CO2 Reduction (Kg)", f"{metrics['CO2 Emission']:,.1f}")
-
-
-            # Add Calendar Chart
-            #st.markdown("<h2 style='font-size:24px;'>Shipments Calendar Heatmap</h2>", unsafe_allow_html=True)
-
             consolidated_df = pd.DataFrame(all_consolidated_shipments)
 
             st.write("View Detailed Metrics Summary")
@@ -1187,7 +1127,6 @@ def cost_calculation(parameters, best_params , total_capacity):
                         st.components.v1.html(chart_original.render_embed(), height=216, width=1000)
                         st.components.v1.html(chart_consolidated.render_embed(), height=216, width=1000)
 
-                        # Add a divider between years
                         if year == 2023:
                             st.write("----------------------")  # Optional divider for visual separation
 
