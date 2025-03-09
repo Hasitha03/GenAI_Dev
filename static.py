@@ -864,9 +864,9 @@ def calculate_cost(total_pallets, prod_type, postcode, rate_card):
 
 
 
-def cost_of_columns(filter_data, rate_card):
-
-    aggregated_data = filter_data.groupby(
+def cost_of_columns(filtered_data, rate_card):
+    print(filtered_data)
+    aggregated_data = filtered_data.groupby(
         ['PROD TYPE', 'SHORT_POSTCODE', 'ORDER_ID', 'SHIPPED_DATE'], as_index=False
     ).agg({'Total Pallets': 'sum', 'Distance': 'first', 'NAME': 'first'})
 
@@ -908,10 +908,10 @@ def consolidate_shipments(aggregated_data, rate_card, day_mapping):
 def find_cost_savings(complete_input, rate_card, selected_scenarios ,parameters):
 
 
-    filter_data = cost_cosnsolidation.get_filtered_data(parameters, complete_input)
+    filtered_data = cost_cosnsolidation.get_filtered_data(parameters, complete_input)
 
 
-    aggregated_data , total_shipment_cost = cost_of_columns(filter_data, rate_card)
+    aggregated_data , total_shipment_cost = cost_of_columns(filtered_data, rate_card)
     # st.dataframe(aggregated_data)
 
     scenario_results = []
