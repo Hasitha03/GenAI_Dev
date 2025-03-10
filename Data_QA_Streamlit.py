@@ -398,67 +398,6 @@ sample_queries = [
 ]
 
 
-# @register_validator(name="check_relevance", data_type="string")
-# class RelevanceValidator(Validator):
-#     def __init__(self, on_fail=None):
-#         super().__init__(on_fail=on_fail)
-#         self.dataset_description = Description_of_Data.lower()
-#         self.sample_questions = [q.lower() for q in sample_queries]
-#
-#         self.negative_keywords = [
-#             "advertisement", "google", "social media", "marketing",
-#             "website", "seo", "click", "impression", "campaign"
-#         ]
-#
-#         # 🟢 Required context keywords from shipping domain
-#         self.required_context = [
-#             "shipping", "pallet", "postcode", "prod type",
-#             "customer", "consolidate", "distance", "destination",
-#             "cost saving", "order id", "shipment"
-#         ]
-#
-#     def _validate(self, value, metadata=None):
-#         query = value.lower()
-#
-#         if any(nk in query for nk in self.negative_keywords):
-#             #st.write(f"🚫 Blocked by negative keywords")
-#             return FailResult("Query about unrelated domain (ads/marketing)")
-#
-#             # 2️⃣ Second check: Must contain shipping-related context
-#         if not any(rc in query for rc in self.required_context):
-#             #st.write(f"🚫 Missing required shipping context")
-#             return FailResult("Query lacks shipping-specific terminology")
-#
-#             # 3️⃣ Third check: Dataset keyword alignment
-#         dataset_keywords = ["cost saving", "order", "distance",
-#                             "prod_type", "short_postcode", "customer" ,"postcodes"]
-#         if not any(kw in query for kw in dataset_keywords):
-#             #st.write(f"🚫 No dataset-specific keywords found")
-#             return FailResult("Query doesn't reference dataset columns")
-#
-#         max_similarity = max(fuzz.ratio(query, q) for q in self.sample_questions)
-#         if max_similarity < 60:  # More strict threshold
-#             st.write(f"🚫 No similar sample questions ({max_similarity}%)")
-#             return FailResult("Query pattern doesn't match known use cases")
-#
-#         keywords = self.dataset_description.replace("\n", " ").split(" ")
-#         keywords = [word.strip(".,-") for word in keywords if word.strip(".,-")]
-#
-#         # Check if any keyword is in the query
-#         if any(keyword in query for keyword in keywords):
-#             st.write("✅ Query matches dataset description.")
-#             return PassResult()
-#
-#         # ✅ Fuzzy Matching with Sample Questions (Threshold 80 for High Similarity)
-#         for question in self.sample_questions:
-#             similarity_score = fuzz.ratio(query, question)
-#             if similarity_score > 80:  # 80% or higher similarity
-#                 st.write(f"✅ Query matches a sample question ({similarity_score}% similarity).")
-#                 return PassResult()
-#
-#         st.write("🚫 Query is NOT relevant.")  # Debug log
-#         return FailResult(error_message="Query is unrelated to your dataset.")
-
 @register_validator(name="check_relevance", data_type="string")
 class RelevanceValidator(Validator):
     def __init__(self, on_fail=None):
@@ -466,78 +405,77 @@ class RelevanceValidator(Validator):
         self.dataset_description = Description_of_Data.lower()
         self.sample_questions = [q.lower() for q in sample_queries]
 
-        # Negative keywords to block irrelevant questions
         self.negative_keywords = [
             "advertisement", "google", "social media", "marketing",
-            "website", "click", "impression", "campaign"
+            "website", "seo", "click", "impression", "campaign"
         ]
 
-        # Required context keywords from shipping domain
+        # 🟢 Required context keywords from shipping domain
         self.required_context = [
             "shipping", "pallet", "postcode", "prod type",
             "customer", "consolidate", "distance", "destination",
             "cost saving", "order id", "shipment"
         ]
 
-        # Dataset-specific keywords
-        self.dataset_keywords = [
-            "cost saving", "order", "distance",
-            "prod_type", "short_postcode", "customer", "postcodes"
-        ]
-
     def _validate(self, value, metadata=None):
         query = value.lower()
 
-        # 1️⃣ First check: Block questions with negative keywords
         if any(nk in query for nk in self.negative_keywords):
-            st.write(f"🚫 Blocked by negative keywords")
+            #st.write(f"🚫 Blocked by negative keywords")
             return FailResult("Query about unrelated domain (ads/marketing)")
 
-        # 2️⃣ Second check: Must contain at least TWO shipping-related keywords
-        shipping_keywords_found = sum(rc in query for rc in self.required_context)
-        if shipping_keywords_found < 2:  # Require at least 2 relevant keywords
-            st.write(f"🚫 Missing required shipping context")
-            return FailResult("Query lacks sufficient shipping-specific terminology")
+            # 2️⃣ Second check: Must contain shipping-related context
+        if not any(rc in query for rc in self.required_context):
+            #st.write(f"🚫 Missing required shipping context")
+            return FailResult("Query lacks shipping-specific terminology")
 
-        # 3️⃣ Third check: Dataset keyword alignment
-        dataset_keywords_found = sum(kw in query for kw in self.dataset_keywords)
-        if dataset_keywords_found < 2:  # Require at least 2 dataset-specific keywords
-            st.write(f"🚫 No dataset-specific keywords found")
+            # 3️⃣ Third check: Dataset keyword alignment
+        dataset_keywords = ["cost saving", "order", "distance",
+                            "prod_type", "short_postcode", "customer" ,"postcodes"]
+        if not any(kw in query for kw in dataset_keywords):
+            #st.write(f"🚫 No dataset-specific keywords found")
             return FailResult("Query doesn't reference dataset columns")
 
-        # 4️⃣ Fourth check: Fuzzy Matching with Sample Questions (Strict Threshold)
         max_similarity = max(fuzz.ratio(query, q) for q in self.sample_questions)
-        if max_similarity < 70:  # Increased threshold for stricter matching
+        if max_similarity < 60:  # More strict threshold
             st.write(f"🚫 No similar sample questions ({max_similarity}%)")
             return FailResult("Query pattern doesn't match known use cases")
 
-        # 5️⃣ Fifth check: Semantic relevance to dataset description
         keywords = self.dataset_description.replace("\n", " ").split(" ")
         keywords = [word.strip(".,-") for word in keywords if word.strip(".,-")]
-        if not any(keyword in query for keyword in keywords):
-            st.write("🚫 Query doesn't match dataset description.")
-            return FailResult("Query is unrelated to your dataset.")
 
-        # ✅ If all checks pass, the query is relevant
-        st.write("✅ Query is relevant.")
-        return PassResult()
+        # Check if any keyword is in the query
+        if any(keyword in query for keyword in keywords):
+            st.write("✅ Query matches dataset description.")
+            return PassResult()
+
+        # ✅ Fuzzy Matching with Sample Questions (Threshold 80 for High Similarity)
+        for question in self.sample_questions:
+            similarity_score = fuzz.ratio(query, question)
+            if similarity_score > 80:  # 80% or higher similarity
+                st.write(f"✅ Query matches a sample question ({similarity_score}% similarity).")
+                return PassResult()
+
+        st.write("🚫 Query is NOT relevant.")  # Debug log
+        return FailResult(error_message="Query is unrelated to your dataset.")
+
 
 
 def analyze_data_with_execution(df, question, api_key, data_source):
     # Get the appropriate prompt file based on data source
-    validators = [RelevanceValidator(on_fail=OnFailAction.EXCEPTION)]
-
-    guard = Guard.for_string(validators)
-    #guard = Guard.from_string(validators=[RelevanceValidator(on_fail=OnFailAction.EXCEPTION)])
-
-    # Validate the relevance of the question
-    try:
-        guard.validate(question, metadata={})
-    except Exception as e:
-        st.write("🚫 The question is NOT relevant to the dataset. Please ask a relevant question.")
-        return None  # Stop execution if the question is not relevant
-
-    # If the question is relevant, proceed with the analysis
+    # validators = [RelevanceValidator(on_fail=OnFailAction.EXCEPTION)]
+    #
+    # guard = Guard.for_string(validators)
+    # #guard = Guard.from_string(validators=[RelevanceValidator(on_fail=OnFailAction.EXCEPTION)])
+    #
+    # # Validate the relevance of the question
+    # try:
+    #     guard.validate(question, metadata={})
+    # except Exception as e:
+    #     st.write("🚫 The question is NOT relevant to the dataset. Please ask a relevant question.")
+    #     return None  # Stop execution if the question is not relevant
+    #
+    # # # If the question is relevant, proceed with the analysis
 
     prompt_file = get_prompt_file(data_source)
 

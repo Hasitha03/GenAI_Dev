@@ -641,8 +641,8 @@ div.stDownloadButton > button:hover {
 </style>
 """, unsafe_allow_html=True)
 
-    
-# Simulation tab
+
+
 def run_cost_optimization_simulation(parameters , api_key , total_capacity,shipment_window , customers , postcodes):
 
     start_date= parameters['start_date']
@@ -799,8 +799,6 @@ def run_cost_optimization_simulation(parameters , api_key , total_capacity,shipm
                 )
                 all_consolidated_shipments.extend(consolidated_shipments)
                 all_allocation_matrices.append(allocation_matrix)
-                #progress_percentage = int(((i + 1) / len(grouped)) * 100)
-                #progress_bar(progress_percentage)
 
             selected_postcodes = ", ".join(postcodes) if postcodes else "All Postcodes"
             selected_customers = ", ".join(customers) if customers else "All Customers"
@@ -833,7 +831,6 @@ def run_cost_optimization_simulation(parameters , api_key , total_capacity,shipm
             )
             rephrase_main_text = rephrase_text(api_key, main_text)
             st.write(rephrase_main_text)
-
 
 
     # Save results and charts
