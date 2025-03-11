@@ -25,6 +25,8 @@ from guardrails.validator_base import Validator, PassResult, FailResult, registe
 from fuzzywuzzy import fuzz
 
 # Streamlit app configuration
+st.write("App restarted successfully")
+
 st.set_page_config(
     page_title="Perrigo GenAI Answer Bot",
     page_icon="📊",
