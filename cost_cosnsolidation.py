@@ -312,7 +312,7 @@ def calculate_metrics(all_consolidated_shipments, df):
     return metrics
 
 def create_utilization_chart(all_consolidated_shipments):
-    print(all_consolidated_shipments)  #### checkkkk
+    #print(all_consolidated_shipments)  #### checkkkk
     utilization_bins = {f"{i}-{i+5}%": 0 for i in range(0, 100, 5)}
     for shipment in all_consolidated_shipments:
         utilization = shipment['Utilization %']
