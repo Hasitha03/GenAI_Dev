@@ -345,9 +345,11 @@ def create_consolidated_shipments_calendar(consolidated_df):
     # Split data by year
     df_2023 = df_consolidated[df_consolidated['Date'].dt.year == 2023]
     df_2024 = df_consolidated[df_consolidated['Date'].dt.year == 2024]
+    df_2025 = df_consolidated[df_consolidated['Date'].dt.year == 2025]
     
     calendar_data_2023 = df_2023[['Date', 'Shipments Count', 'Orders Count']].values.tolist()
     calendar_data_2024 = df_2024[['Date', 'Shipments Count', 'Orders Count']].values.tolist()
+    calendar_data_2025 = df_2025[['Date', 'Shipments Count', 'Orders Count']].values.tolist()
 
     def create_calendar(data, year):
         return (
@@ -397,8 +399,10 @@ def create_consolidated_shipments_calendar(consolidated_df):
 
     calendar_2023 = create_calendar(calendar_data_2023, 2023)
     calendar_2024 = create_calendar(calendar_data_2024, 2024)
+    calendar_2025 = create_calendar(calendar_data_2025, 2025)
 
-    return calendar_2023, calendar_2024
+
+    return calendar_2023, calendar_2024 , calendar_2025
 
 def create_original_orders_calendar(original_df):
     df_original = original_df.groupby('SHIPPED_DATE').size().reset_index(name='Orders Shipped')
@@ -406,9 +410,11 @@ def create_original_orders_calendar(original_df):
     # Split data by year
     df_2023 = df_original[df_original['SHIPPED_DATE'].dt.year == 2023]
     df_2024 = df_original[df_original['SHIPPED_DATE'].dt.year == 2024]
+    df_2025 = df_original[df_original['SHIPPED_DATE'].dt.year == 2025]
     
     calendar_data_2023 = df_2023[['SHIPPED_DATE', 'Orders Shipped']].values.tolist()
     calendar_data_2024 = df_2024[['SHIPPED_DATE', 'Orders Shipped']].values.tolist()
+    calendar_data_2025 = df_2025[['SHIPPED_DATE', 'Orders Shipped']].values.tolist()
 
     def create_calendar(data, year):
         return (
@@ -456,13 +462,14 @@ def create_original_orders_calendar(original_df):
 
     calendar_2023 = create_calendar(calendar_data_2023, 2023)
     calendar_2024 = create_calendar(calendar_data_2024, 2024)
+    calendar_2025 = create_calendar(calendar_data_2025, 2025)
 
-    return calendar_2023, calendar_2024
+    return calendar_2023, calendar_2024 , calendar_2025
 
 def create_heatmap_and_bar_charts(consolidated_df, original_df, start_date, end_date):
     # Create calendar charts (existing code)
-    chart_original_2023, chart_original_2024 = create_original_orders_calendar(original_df)
-    chart_consolidated_2023, chart_consolidated_2024 = create_consolidated_shipments_calendar(consolidated_df)
+    chart_original_2023, chart_original_2024  , chart_original_2025 = create_original_orders_calendar(original_df)
+    chart_consolidated_2023, chart_consolidated_2024 , chart_consolidated_2025 = create_consolidated_shipments_calendar(consolidated_df)
     
     # Create bar charts for orders over time
     def create_bar_charts(df_original, df_consolidated, year):
@@ -563,10 +570,12 @@ def create_heatmap_and_bar_charts(consolidated_df, original_df, start_date, end_
     # Create bar charts for both years
     bar_charts_2023 = create_bar_charts(original_df, consolidated_df, 2023)
     bar_charts_2024 = create_bar_charts(original_df, consolidated_df, 2024)
+    bar_charts_2025 = create_bar_charts(original_df, consolidated_df, 2025)
     
     return {
         2023: (chart_original_2023, chart_consolidated_2023, bar_charts_2023),
-        2024: (chart_original_2024, chart_consolidated_2024, bar_charts_2024)
+        2024: (chart_original_2024, chart_consolidated_2024, bar_charts_2024),
+        2025: (chart_original_2025, chart_consolidated_2025, bar_charts_2025)
     }
 
 
@@ -1115,7 +1124,7 @@ def cost_calculation(parameters, best_params , total_capacity):
             years_in_range = set(pd.date_range(start_date, end_date).year)
 
             with st.expander("Heatmap Analysis Charts(Before & After Consolidation)"):
-                for year in [2023, 2024]:
+                for year in [2023, 2024 , 2025]:
                     if year in years_in_range:
                         chart_original, chart_consolidated, bar_comparison = charts[year]
 

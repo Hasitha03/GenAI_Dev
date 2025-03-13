@@ -15,5 +15,5 @@ Here is an example of what one row of the data looks like in json format but I w
 
 Some key things to note about the data:
 - The "PROD_TYPE" column includes 2 values, either "AMBIENT" or "AMBCONTROL"
-- The "SHIPPED_DATE" column ranges from Jan 2024 to Aug 2024 and is in dd-mm-yyyy format
+- The "SHIPPED_DATE" column ranges from Jan 2023 to Feb 2025 and is in dd-mm-yyyy format
 - The "Cost" is in Pounds(£)
