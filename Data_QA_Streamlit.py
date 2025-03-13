@@ -31,7 +31,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
+st.write("app restarted")
 logo = Image.open("Images/perrigo-logo.png")
 st.image(logo, width=120)
 
