@@ -34,7 +34,6 @@ st.set_page_config(
 logo = Image.open("Images/perrigo-logo.png")
 st.image(logo, width=120)
 
-st.write("app restarted")
 # Custom CSS
 st.markdown("""
     <style>
