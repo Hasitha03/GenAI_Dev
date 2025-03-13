@@ -642,7 +642,7 @@ def create_original_orders_calendar(original_df):
     # Split data by year
     df_2023 = df_original[df_original['SHIPPED_DATE'].dt.year == 2023]
     df_2024 = df_original[df_original['SHIPPED_DATE'].dt.year == 2024]
-    df_2025 = df_original[df_original['UPDATED_DATE'].dt.year == 2025]
+    df_2025 = df_original[df_original['SHIPPED_DATE'].dt.year == 2025]
 
     calendar_data_2023 = df_2023[['SHIPPED_DATE', 'Orders Shipped', 'Total Pallets']].values.tolist()
     calendar_data_2024 = df_2024[['SHIPPED_DATE', 'Orders Shipped', 'Total Pallets']].values.tolist()
@@ -1045,10 +1045,9 @@ def find_cost_savings(complete_input, rate_card, selected_scenarios ,parameters)
 
     charts = create_heatmap_and_bar_charts(consolidated_data, aggregated_data, parameters['start_date'], parameters['end_date'])
 
-    years_in_range = set(pd.date_range(parameters['start_date'], parameters['end_date']).year)
-
     with st.expander("Heatmap Analysis Charts(Before & After Consolidation)"):
-        for year in [2023 , 2024 , 2025]:
+        years_in_range = set(pd.date_range(parameters['start_date'], parameters['end_date']).year)
+        for year in [2023,2024,2025]:
             if year in years_in_range:
                 chart_original, chart_consolidated, bar_comparison = charts[year]
 

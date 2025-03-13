@@ -1125,6 +1125,7 @@ def cost_calculation(parameters, best_params , total_capacity):
 
             with st.expander("Heatmap Analysis Charts(Before & After Consolidation)"):
                 years_in_range = set(pd.date_range(start_date, end_date).year)
+
                 for year in [2023,2024,2025]:
                     if year in years_in_range :
                         chart_original, chart_consolidated, bar_comparison = charts[year]
