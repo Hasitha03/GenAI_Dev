@@ -602,7 +602,6 @@ def get_sample_queries(data_source):
             "Identify the SHORT_POSTCODE areas with the highest total shipping costs and also mention their cost per pallet.",
             "Provide me the top 3 customers with highest shipment cost for January?",
             "Show me trends on total costs monthly for top 3 customers",
-            "How does cost vary for tesco month over month?",
             "For ambient product type, which are the top 5 customers with total orders > 10 and highest standard deviation in cost per pallet?",
             "How does the cost per order vary with distance within each PROD TYPE?",
             "How can I optimize the shipment costs for user ALLOGA UK in January?",
